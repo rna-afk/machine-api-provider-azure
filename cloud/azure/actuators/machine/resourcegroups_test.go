@@ -1,4 +1,4 @@
-package azure_provider
+package machine
 
 import (
 	"testing"

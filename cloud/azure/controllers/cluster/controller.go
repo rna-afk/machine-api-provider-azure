@@ -1,12 +1,12 @@
-package cluster_controller_app
+package cluster_controller
 
 import (
 	"os"
 
 	"github.com/golang/glog"
 	"github.com/kubernetes-incubator/apiserver-builder/pkg/controller"
-	microsoft "github.com/platform9/azure-provider"
-	"github.com/platform9/azure-provider/cmd/azure-controller/cluster-controller-app/options"
+	azure "github.com/platform9/azure-provider/cloud/azure/actuators/cluster"
+	"github.com/platform9/azure-provider/cloud/azure/controllers/cluster/options"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -39,10 +39,10 @@ func StartClusterController(server *options.ClusterControllerServer, shutdown <-
 		glog.Fatalf("Could not create client for talking to the apiserver: %v", err)
 	}
 
-	params := microsoft.ClusterActuatorParams{
+	params := azure.ClusterActuatorParams{
 		ClusterClient: client.ClusterV1alpha1().Clusters(corev1.NamespaceDefault),
 	}
-	actuator, err := microsoft.NewClusterActuator(params)
+	actuator, err := azure.NewClusterActuator(params)
 	if err != nil {
 		glog.Fatalf("Could not create azure cluster actuator: %v", err)
 	}

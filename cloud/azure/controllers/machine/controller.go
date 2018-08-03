@@ -1,12 +1,12 @@
-package machine_controller_app
+package machine_controller
 
 import (
 	"os"
 
 	"github.com/golang/glog"
 	"github.com/kubernetes-incubator/apiserver-builder/pkg/controller"
-	microsoft "github.com/platform9/azure-provider"
-	"github.com/platform9/azure-provider/cmd/azure-controller/machine-controller-app/options"
+	azure "github.com/platform9/azure-provider/cloud/azure/actuators/machine"
+	"github.com/platform9/azure-provider/cloud/azure/controllers/machine/options"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -39,11 +39,11 @@ func StartMachineController(server *options.MachineControllerServer, shutdown <-
 		glog.Fatalf("Could not create client for talking to the apiserver: %v", err)
 	}
 
-	params := microsoft.MachineActuatorParams{
+	params := azure.MachineActuatorParams{
 		V1Alpha1Client: client.ClusterV1alpha1(),
 		KubeadmToken:   "dummy",
 	}
-	actuator, err := microsoft.NewMachineActuator(params)
+	actuator, err := azure.NewMachineActuator(params)
 
 	if err != nil {
 		glog.Fatalf("Could not create azure machine actuator: %v", err)

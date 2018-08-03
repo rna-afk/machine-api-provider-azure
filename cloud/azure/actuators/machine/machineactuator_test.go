@@ -10,7 +10,7 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
-package azure_provider
+package machine
 
 import (
 	"errors"
@@ -23,9 +23,9 @@ import (
 	"github.com/Azure/go-autorest/autorest/azure/auth"
 	"github.com/ghodss/yaml"
 	"github.com/joho/godotenv"
-	v1alpha1 "github.com/platform9/azure-provider/azureproviderconfig/v1alpha1"
-	"github.com/platform9/azure-provider/machinesetup"
-	"github.com/platform9/azure-provider/wrappers"
+	"github.com/platform9/azure-provider/cloud/azure/providerconfig/v1alpha1"
+	"github.com/platform9/azure-provider/cloud/azure/actuators/machine/machinesetup"
+	"github.com/platform9/azure-provider/cloud/azure/actuators/machine/wrappers"
 	"sigs.k8s.io/cluster-api/pkg/apis/cluster/common"
 	clusterv1 "sigs.k8s.io/cluster-api/pkg/apis/cluster/v1alpha1"
 )
@@ -222,7 +222,60 @@ func TestBase64Encoding(t *testing.T) {
 }
 
 func TestGetStartupScript(t *testing.T) {
-	expectedStartupScript := "echo 'Hello world!'"
+	expectedStartupScript := `apt-get update
+apt-get install -y docker.io
+apt-get update && apt-get install -y apt-transport-https curl prips
+curl -s https://packages.cloud.google.com/apt/doc/apt-key.gpg | apt-key add -
+cat <<EOF >/etc/apt/sources.list.d/kubernetes.list
+deb http://apt.kubernetes.io/ kubernetes-xenial main
+EOF
+apt-get update
+apt-get install -y kubelet kubeadm kubectl
+
+CLUSTER_DNS_SERVER=$(prips "10.96.0.0/12" | head -n 11 | tail -n 1)
+CLUSTER_DNS_DOMAIN="cluster.local"
+# Override network args to use kubenet instead of cni and override Kubelet DNS args.
+cat > /etc/systemd/system/kubelet.service.d/20-kubenet.conf <<EOF
+[Service]
+Environment="KUBELET_NETWORK_ARGS=--network-plugin=kubenet"
+Environment="KUBELET_DNS_ARGS=--cluster-dns=${CLUSTER_DNS_SERVER} --cluster-domain=${CLUSTER_DNS_DOMAIN}"
+EOF
+systemctl daemon-reload
+systemctl restart kubelet.service
+
+PORT=6443
+PRIVATEIP=$(curl -H Metadata:true "http://169.254.169.254/metadata/instance/network/interface/0/ipv4/ipAddress/0/privateIpAddress?api-version=2017-04-01&format=text")
+PUBLICIP=$(curl -H Metadata:true "http://169.254.169.254/metadata/instance/network/interface/0/ipv4/ipAddress/0/publicIpAddress?api-version=2017-04-02&format=text")
+
+# Set up kubeadm config file to pass parameters to kubeadm init.
+cat > kubeadm_config.yaml <<EOF
+apiVersion: kubeadm.k8s.io/v1alpha1
+kind: MasterConfiguration
+api:
+  advertiseAddress: ${PUBLICIP}
+  bindPort: ${PORT}
+networking:
+  serviceSubnet: "10.96.0.0/12"
+token: "testtoken"
+controllerManagerExtraArgs:
+  cluster-cidr: "192.168.0.0/16"
+  service-cluster-ip-range: "10.96.0.0/12"
+  allocate-node-cidrs: "true"
+EOF
+
+# Create and set bridge-nf-call-iptables to 1 to pass the kubeadm preflight check.
+# Workaround was found here:
+# http://zeeshanali.com/sysadmin/fixed-sysctl-cannot-stat-procsysnetbridgebridge-nf-call-iptables/
+modprobe br_netfilter
+
+kubeadm init --config ./kubeadm_config.yaml
+sleep 30
+kubectl apply -f https://raw.githubusercontent.com/cloudnativelabs/kube-router/master/daemonset/kubeadm-kuberouter.yaml
+
+mkdir -p /home/ClusterAPI/.kube
+cp -i /etc/kubernetes/admin.conf /home/ClusterAPI/.kube/config
+chown $(id -u ClusterAPI):$(id -g ClusterAPI) /home/ClusterAPI/.kube/config`
+
 	azure := AzureClient{
 		machineSetupConfigs: machinesetup.MachineSetup{
 			Items: []machinesetup.Params{
@@ -246,7 +299,7 @@ func TestGetStartupScript(t *testing.T) {
 			},
 		},
 	}
-	actualStartupScript, err := azure.getStartupScript(machine)
+	actualStartupScript, err := azure.getStartupScript(nil, machine)
 	if err != nil {
 		t.Fatalf("unable to get startup script: %v", err)
 	}
@@ -262,7 +315,7 @@ func TestConvertMachineToDeploymentParams(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unable to create mock azure client: %v", err)
 	}
-	params, err := azure.convertMachineToDeploymentParams(machines[0])
+	params, err := azure.convertMachineToDeploymentParams(nil, machines[0])
 	if err != nil {
 		t.Fatalf("unable to convert machine to deployment params: %v", err)
 	}

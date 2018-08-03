@@ -1,14 +1,12 @@
-package azure_provider
+package machine
 
 import (
 	"errors"
 	"fmt"
-	"log"
 
-	"github.com/Azure/azure-sdk-for-go/profiles/latest/network/mgmt/network"
 	"github.com/Azure/azure-sdk-for-go/services/resources/mgmt/2018-02-01/resources"
-	azureconfigv1 "github.com/platform9/azure-provider/azureproviderconfig/v1alpha1"
-	"github.com/platform9/azure-provider/wrappers"
+	azureconfigv1 "github.com/platform9/azure-provider/cloud/azure/providerconfig/v1alpha1"
+	"github.com/platform9/azure-provider/cloud/azure/actuators/machine/wrappers"
 	clusterv1 "sigs.k8s.io/cluster-api/pkg/apis/cluster/v1alpha1"
 )
 
@@ -32,7 +30,7 @@ func (azure *AzureClient) createOrUpdateDeployment(cluster *clusterv1.Cluster, m
 		return nil, err
 	}
 	//Convert machine provider config to ARM parameters
-	params, err := azure.convertMachineToDeploymentParams(machine)
+	params, err := azure.convertMachineToDeploymentParams(cluster, machine)
 	if err != nil {
 		return nil, err
 	}
@@ -113,40 +111,6 @@ func (azure *AzureClient) vmIfExists(cluster *clusterv1.Cluster, machine *cluste
 		return nil, nil
 	}
 	return &deployment, nil
-}
-
-func (azure *AzureClient) getLogin(cluster *clusterv1.Cluster, machine *clusterv1.Machine) (string, string, error) {
-	//Parse in provider configs
-	var machineConfig azureconfigv1.AzureMachineProviderConfig
-	err := azure.decodeMachineProviderConfig(machine.Spec.ProviderConfig, &machineConfig)
-	if err != nil {
-		return "", "", err
-	}
-	var clusterConfig azureconfigv1.AzureClusterProviderConfig
-	err = azure.decodeClusterProviderConfig(cluster.Spec.ProviderConfig, &clusterConfig)
-	if err != nil {
-		return "", "", err
-	}
-	params, err := readJSON(parametersFile)
-	if err != nil {
-		log.Fatalf("Unable to read parameters. Get login information with `az network public-ip list -g %s", clusterConfig.ResourceGroup)
-	}
-
-	addressClient := network.NewPublicIPAddressesClient(azure.SubscriptionID)
-	addressClient.Authorizer = azure.Authorizer
-	ipName := (*params)["publicIPAddresses_Quickstart_ip_name"].(map[string]interface{})
-	ipAddress, err := addressClient.Get(azure.ctx, clusterConfig.ResourceGroup, ipName["value"].(string), "")
-	if err != nil {
-		log.Fatalf("Unable to get IP information. Try using `az network public-ip list -g %s", clusterConfig.ResourceGroup)
-	}
-
-	vmUser := (*params)["vm_user"].(map[string]interface{})
-
-	log.Printf("Log in with ssh: %s@%s, password: %s",
-		vmUser["value"].(string),
-		*ipAddress.PublicIPAddressPropertiesFormat.IPAddress,
-		azure.VMPassword)
-	return fmt.Sprintf("%s@%s", vmUser["value"].(string), *ipAddress.PublicIPAddressPropertiesFormat.IPAddress), azure.VMPassword, nil
 }
 
 func (azure *AzureClient) deleteVM(deployment *resources.DeploymentExtended, resourceGroupName string) error {

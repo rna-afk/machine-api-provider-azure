@@ -11,7 +11,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package azure_provider
+package machine
 
 import (
 	"context"
@@ -19,19 +19,19 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/pkg/sftp"
+	"golang.org/x/crypto/ssh"
 	"io/ioutil"
 	"log"
 	"os"
-	"golang.org/x/crypto/ssh"
-	"github.com/pkg/sftp"
 
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/Azure/go-autorest/autorest/azure/auth"
 	"github.com/golang/glog"
 	"github.com/joho/godotenv"
-	azureconfigv1 "github.com/platform9/azure-provider/azureproviderconfig/v1alpha1"
-	"github.com/platform9/azure-provider/machinesetup"
-	"github.com/platform9/azure-provider/wrappers"
+	azureconfigv1 "github.com/platform9/azure-provider/cloud/azure/providerconfig/v1alpha1"
+	"github.com/platform9/azure-provider/cloud/azure/actuators/machine/machinesetup"
+	"github.com/platform9/azure-provider/cloud/azure/actuators/machine/wrappers"
 	"gopkg.in/yaml.v2"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
@@ -43,7 +43,7 @@ import (
 
 // The Azure Client, also used as a machine actuator
 type AzureClient struct {
-	v1Alpha1Client		client.ClusterV1alpha1Interface
+	v1Alpha1Client      client.ClusterV1alpha1Interface
 	SubscriptionID      string
 	VMPassword          string
 	Authorizer          autorest.Authorizer
@@ -60,13 +60,12 @@ type MachineActuatorParams struct {
 	V1Alpha1Client         client.ClusterV1alpha1Interface
 	KubeadmToken           string
 	MachineSetupConfigPath string
-	// TODO Add more
 }
 
 const (
 	templateFile   = "deployment-template.json"
-	parametersFile = "deployment-params.json"
 	ProviderName   = "azure"
+	SSHUser        = "ClusterAPI"
 )
 
 func init() {
@@ -129,8 +128,12 @@ func (azure *AzureClient) Create(cluster *clusterv1.Cluster, machine *clusterv1.
 	if machine.ObjectMeta.Annotations == nil {
 		machine.ObjectMeta.Annotations = make(map[string]string)
 	}
-	machine.ObjectMeta.Annotations["dummy"] = "dummy"
-	azure.v1Alpha1Client.Machines(machine.Namespace).Update(machine)
+	if azure.v1Alpha1Client != nil {
+		machine.ObjectMeta.Annotations["dummy"] = "dummy"
+		azure.v1Alpha1Client.Machines(machine.Namespace).Update(machine)
+	} else {
+		glog.V(1).Info("ClusterAPI client not found, not updating machine object")
+	}
 	return nil
 }
 
@@ -249,39 +252,6 @@ func (azure *AzureClient) GetKubeConfig(cluster *clusterv1.Cluster, machine *clu
 		return "", fmt.Errorf("unable to read local kubeconfig: %v", err)
 	}
 	return string(content), nil
-
-	/*
-	out, err := exec.Command("scp",
-		"-i", SSHKeyFile,
-		"-o", "StrictHostKeyChecking=no",
-		"-o", "UserKnownHostsFile=/dev/null",
-		"-v",
-		fmt.Sprintf("ClusterAPI@%s:/home/ClusterAPI/.kube/config", ip),
-		".").CombinedOutput()
-	outString := string(out)
-	if err != nil {
-		return "", fmt.Errorf("scp: %v, error: %v", outString, err)
-	}
-	res, err := ioutil.ReadFile("config")
-	if err != nil {
-		return "", err
-	}
-	return string(res), nil
-	*/
-	/*
-	//az vm run-command invoke --name [vm_name] --resource-group [rg_name] --command-id RunShellScript --scripts 'sudo cat /etc/kubernetes/admin.conf'
-	script := "sudo cat /etc/kubernetes/admin.conf"
-	result := util.ExecCommand(
-		"az", "vm", "run-command", "invoke",
-		"--name", machine.ObjectMeta.Name,
-		"--resource-group", clusterConfig.ResourceGroup,
-		"--command-id", "RunShellScript",
-		"--scripts", script)
-	var parsed map[string]interface{}
-	err = json.Unmarshal([]byte(result), &parsed)
-	message := parsed["output"].([]map[string]interface{})[0]["message"].(string)
-	return message, nil
-	*/
 }
 
 func GetSshClient(host string, privatekey string) (*ssh.Client, error) {
@@ -291,7 +261,7 @@ func GetSshClient(host string, privatekey string) (*ssh.Client, error) {
 		return nil, fmt.Errorf("unable to parse private key: %v", err)
 	}
 	config := &ssh.ClientConfig{
-		User: "ClusterAPI",
+		User: SSHUser,
 		Auth: []ssh.AuthMethod{
 			ssh.PublicKeys(signer),
 		},
@@ -354,45 +324,13 @@ func base64EncodeCommand(command string) *string {
 	return &encoded
 }
 
-// Generate ssh key pair
-/*
-func (azure *AzureClient) generateSSHKey() error {
-	c1 := exec.Command("yes", "y")
-	c2 := exec.Command("ssh-keygen",
-		"-t", "rsa",
-		"-b", "2048",
-		"-f", SSHKeyFile,
-		"-N", "")
-	r, w := io.Pipe()
-	c1.Stdout = w
-	c2.Stdin = r
-	c1.Start()
-	out, err := c2.CombinedOutput()
-	outString := string(out)
-	if err != nil {
-		return fmt.Errorf("ssh-keygen: %v, error: %v", outString, err)
-	}
-	publicKey, err := ioutil.ReadFile(fmt.Sprintf("%s.pub", SSHKeyFile))
-	if err != nil {
-		return fmt.Errorf("ssh-keygen: %v, error: %v", outString, err)
-	}
-	privateKey, err := ioutil.ReadFile(SSHKeyFile)
-	if err != nil {
-		return err
-	}
-	azure.SSHPubKey = string(publicKey)
-	azure.SSHPrivateKey = string(privateKey)
-	return nil
-}
-*/
-
-func (azure *AzureClient) convertMachineToDeploymentParams(machine *clusterv1.Machine) (*map[string]interface{}, error) {
+func (azure *AzureClient) convertMachineToDeploymentParams(cluster *clusterv1.Cluster, machine *clusterv1.Machine) (*map[string]interface{}, error) {
 	var machineConfig azureconfigv1.AzureMachineProviderConfig
 	err := azure.decodeMachineProviderConfig(machine.Spec.ProviderConfig, &machineConfig)
 	if err != nil {
 		return nil, err
 	}
-	startupScript, err := azure.getStartupScript(machine)
+	startupScript, err := azure.getStartupScript(cluster, machine)
 	if err != nil {
 		return nil, err
 	}
@@ -421,7 +359,7 @@ func (azure *AzureClient) convertMachineToDeploymentParams(machine *clusterv1.Ma
 			"value": "ClusterAPISubnet",
 		},
 		"securityRules_default_allow_ssh_name": map[string]interface{}{
-			"value": "clusterapiuser",
+			"value": "ClusterAPISSH",
 		},
 		"image_publisher": map[string]interface{}{
 			"value": machineConfig.Image.Publisher,
@@ -484,8 +422,9 @@ func parseMachineSetupConfig(path string) (*machinesetup.MachineSetup, error) {
 }
 
 // Get the startup script from the machine_set_configs, taking into account the role of the given machine
-func (azure *AzureClient) getStartupScript(machine *clusterv1.Machine) (string, error) {
-	const startupScript = `apt-get update
+func (azure *AzureClient) getStartupScript(cluster *clusterv1.Cluster, machine *clusterv1.Machine) (string, error) {
+	if machine.Spec.Roles[0] == "Master" {
+		const startupScript = `apt-get update
 apt-get install -y docker.io
 apt-get update && apt-get install -y apt-transport-https curl prips
 curl -s https://packages.cloud.google.com/apt/doc/apt-key.gpg | apt-key add -
@@ -519,7 +458,7 @@ api:
   bindPort: ${PORT}
 networking:
   serviceSubnet: "10.96.0.0/12"
-kubernetesVersion: v1.9.4
+token: "testtoken"
 controllerManagerExtraArgs:
   cluster-cidr: "192.168.0.0/16"
   service-cluster-ip-range: "10.96.0.0/12"
@@ -532,11 +471,39 @@ EOF
 modprobe br_netfilter
 
 kubeadm init --config ./kubeadm_config.yaml
+sleep 30
+kubectl apply -f https://raw.githubusercontent.com/cloudnativelabs/kube-router/master/daemonset/kubeadm-kuberouter.yaml
 
 mkdir -p /home/ClusterAPI/.kube
 cp -i /etc/kubernetes/admin.conf /home/ClusterAPI/.kube/config
 chown $(id -u ClusterAPI):$(id -g ClusterAPI) /home/ClusterAPI/.kube/config`
-	return startupScript, nil
+		return startupScript, nil
+	} else if machine.Spec.Roles[0] == "Node" {
+		const startupScript = `apt-get update
+apt-get install -y docker.io
+apt-get update && apt-get install -y apt-transport-https curl prips
+curl -s https://packages.cloud.google.com/apt/doc/apt-key.gpg | apt-key add -
+cat <<EOF >/etc/apt/sources.list.d/kubernetes.list
+deb http://apt.kubernetes.io/ kubernetes-xenial main
+EOF
+apt-get update
+apt-get install -y kubelet kubeadm kubectl
+
+CLUSTER_DNS_SERVER=$(prips "10.96.0.0/12" | head -n 11 | tail -n 1)
+CLUSTER_DNS_DOMAIN="cluster.local"
+# Override network args to use kubenet instead of cni and override Kubelet DNS args.
+cat > /etc/systemd/system/kubelet.service.d/20-kubenet.conf <<EOF
+[Service]
+Environment="KUBELET_NETWORK_ARGS=--network-plugin=kubenet"
+Environment="KUBELET_DNS_ARGS=--cluster-dns=${CLUSTER_DNS_SERVER} --cluster-domain=${CLUSTER_DNS_DOMAIN}"
+EOF
+systemctl daemon-reload
+systemctl restart kubelet.service
+
+kubeadm join --token "${TOKEN}" "${MASTER}" --ignore-preflight-errors=all --discovery-token-unsafe-skip-ca-verification`
+		return startupScript, nil
+	}
+	return "", errors.New("unable to get startup script: unknown machine role")
 	/* TODO: Use code to get script from machine_setup_configs
 	for _, machineRole := range machine.Spec.Roles {
 		for _, machineSetupItem := range azure.machineSetupConfigs.Items {

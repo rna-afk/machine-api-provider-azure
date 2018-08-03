@@ -1,11 +1,11 @@
-package azure_provider
+package machine
 
 import (
 	"testing"
 
 	"github.com/Azure/azure-sdk-for-go/services/resources/mgmt/2018-02-01/resources"
-	azureconfigv1 "github.com/platform9/azure-provider/azureproviderconfig/v1alpha1"
-	"github.com/platform9/azure-provider/wrappers"
+	azureconfigv1 "github.com/platform9/azure-provider/cloud/azure/providerconfig/v1alpha1"
+	"github.com/platform9/azure-provider/cloud/azure/actuators/machine/wrappers"
 )
 
 // Test creating a deployment with no existing deployments

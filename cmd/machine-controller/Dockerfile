@@ -20,12 +20,12 @@ WORKDIR /go/src/github.com/platform9/azure-provider
 # e.g. docker build -t <tag> -f <this_Dockerfile> <path_to_cluster-api>
 COPY . . 
 
-RUN CGO_ENABLED=0 GOOS=linux go install -a -ldflags '-extldflags "-static"' github.com/platform9/azure-provider/cmd/azure-controller
+RUN CGO_ENABLED=0 GOOS=linux go install -a -ldflags '-extldflags "-static"' github.com/platform9/azure-provider/cmd/machine-controller
 
 # Final container
 FROM debian:stretch-slim
 RUN apt-get update && apt-get install -y ca-certificates openssh-server && rm -rf /var/lib/apt/lists/*
 
-COPY --from=builder /go/bin/azure-controller .
+COPY --from=builder /go/bin/machine-controller .
 COPY --from=builder /go/src/github.com/platform9/azure-provider/deployment-template.json .
 

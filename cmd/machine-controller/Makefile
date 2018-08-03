@@ -14,9 +14,9 @@
 
 .PHONY: image push dev_image dev_push
 
-PREFIX = meegul
-NAME = azure-controller
-TAG = 0.0.28
+PREFIX = platform9
+NAME = cluster-api-azure-machine-controller
+TAG = 0.0.29
 
 image:
 	docker build -t "$(PREFIX)/$(NAME):$(TAG)" -f ./Dockerfile ../..

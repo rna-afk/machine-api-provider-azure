@@ -1,9 +1,9 @@
-package azure_provider
+package machine
 
 import (
 	"fmt"
-	azureconfigv1 "github.com/platform9/azure-provider/azureproviderconfig/v1alpha1"
-	"github.com/platform9/azure-provider/wrappers"
+	azureconfigv1 "github.com/platform9/azure-provider/cloud/azure/providerconfig/v1alpha1"
+	"github.com/platform9/azure-provider/cloud/azure/actuators/machine/wrappers"
 	clusterv1 "sigs.k8s.io/cluster-api/pkg/apis/cluster/v1alpha1"
 )
 
