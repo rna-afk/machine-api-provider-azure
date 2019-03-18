@@ -15,3 +15,15 @@ limitations under the License.
 */
 
 package services
+
+import (
+	"context"
+)
+
+// Service is a generic interface used by components offering a type of service.
+// example: Network service would offer get/createorupdate/delete.
+type Service interface {
+	Get(ctx context.Context) (interface{}, error)
+	CreateOrUpdate(ctx context.Context) error
+	Delete(ctx context.Context) error
+}
