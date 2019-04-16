@@ -131,6 +131,17 @@
 
 [[projects]]
   branch = "master"
+  digest = "1:eaa7c96baf38f6abde2f720aac540a49dfc2229b74c3c591c3f84d2ff7e84269"
+  name = "github.com/go-log/log"
+  packages = [
+    ".",
+    "info",
+  ]
+  pruneopts = "UT"
+  revision = "a514cf01a3eb56ec6aff9ae5663453d990e68ed3"
+
+[[projects]]
+  branch = "master"
   digest = "1:edd2fa4578eb086265db78a9201d15e76b298dfd0d5c379da83e9c61712cf6df"
   name = "github.com/go-logr/logr"
   packages = ["."]
@@ -396,6 +407,51 @@
   pruneopts = "UT"
   revision = "65fb64232476ad9046e57c26cd0bff3d3a8dc6cd"
   version = "v1.4.3"
+
+[[projects]]
+  branch = "openshift-4.0-cluster-api-0.0.0-alpha.4"
+  digest = "1:3cf9fcd481210b6c5d278afdfe2a8b78e7c29a08d439a8bab0492cf93d6ddd28"
+  name = "github.com/openshift/cluster-api"
+  packages = [
+    "cmd/clusterctl/clientcmd",
+    "cmd/clusterctl/clusterdeployer",
+    "cmd/clusterctl/clusterdeployer/bootstrap",
+    "cmd/clusterctl/clusterdeployer/bootstrap/existing",
+    "cmd/clusterctl/clusterdeployer/bootstrap/kind",
+    "cmd/clusterctl/clusterdeployer/bootstrap/minikube",
+    "cmd/clusterctl/clusterdeployer/clusterclient",
+    "cmd/clusterctl/clusterdeployer/provider",
+    "cmd/clusterctl/cmd",
+    "cmd/clusterctl/phases",
+    "cmd/clusterctl/providercomponents",
+    "cmd/clusterctl/validation",
+    "pkg/apis",
+    "pkg/apis/cluster/common",
+    "pkg/apis/cluster/v1alpha1",
+    "pkg/apis/machine/common",
+    "pkg/apis/machine/v1beta1",
+    "pkg/client/clientset_generated/clientset",
+    "pkg/client/clientset_generated/clientset/fake",
+    "pkg/client/clientset_generated/clientset/scheme",
+    "pkg/client/clientset_generated/clientset/typed/cluster/v1alpha1",
+    "pkg/client/clientset_generated/clientset/typed/cluster/v1alpha1/fake",
+    "pkg/client/clientset_generated/clientset/typed/machine/v1beta1",
+    "pkg/client/clientset_generated/clientset/typed/machine/v1beta1/fake",
+    "pkg/controller/error",
+    "pkg/controller/machine",
+    "pkg/controller/noderefutil",
+    "pkg/util",
+  ]
+  pruneopts = "T"
+  revision = "5e580f96e63e5db1fc8095ca5f587716a4a8d9e9"
+
+[[projects]]
+  branch = "master"
+  digest = "1:f7646c654e93258958dba300641f8f674d5a9ed015c11119793ba1156e2acbe9"
+  name = "github.com/openshift/kubernetes-drain"
+  packages = ["."]
+  pruneopts = "UT"
+  revision = "c2e51be1758efa30d71a4d30dc4e2db86b70a4df"
 
 [[projects]]
   digest = "1:e5d0bd87abc2781d14e274807a470acd180f0499f8bf5bb18606e9ec22ad9de9"
@@ -1148,38 +1204,6 @@
   revision = "21c4ce38f2a793ec01e925ddc31216500183b773"
 
 [[projects]]
-  digest = "1:4ee30e8e1afbf89d801151a7d57fcc947eb5764f47de1b5bc697e3cc421dc2bb"
-  name = "sigs.k8s.io/cluster-api"
-  packages = [
-    "cmd/clusterctl/clientcmd",
-    "cmd/clusterctl/clusterdeployer",
-    "cmd/clusterctl/clusterdeployer/bootstrap",
-    "cmd/clusterctl/clusterdeployer/bootstrap/existing",
-    "cmd/clusterctl/clusterdeployer/bootstrap/kind",
-    "cmd/clusterctl/clusterdeployer/bootstrap/minikube",
-    "cmd/clusterctl/clusterdeployer/clusterclient",
-    "cmd/clusterctl/clusterdeployer/provider",
-    "cmd/clusterctl/cmd",
-    "cmd/clusterctl/phases",
-    "cmd/clusterctl/providercomponents",
-    "cmd/clusterctl/validation",
-    "pkg/apis",
-    "pkg/apis/cluster/common",
-    "pkg/apis/cluster/v1alpha1",
-    "pkg/client/clientset_generated/clientset",
-    "pkg/client/clientset_generated/clientset/fake",
-    "pkg/client/clientset_generated/clientset/scheme",
-    "pkg/client/clientset_generated/clientset/typed/cluster/v1alpha1",
-    "pkg/client/clientset_generated/clientset/typed/cluster/v1alpha1/fake",
-    "pkg/controller/error",
-    "pkg/controller/machine",
-    "pkg/controller/noderefutil",
-    "pkg/util",
-  ]
-  pruneopts = "T"
-  revision = "3f43912fdb392b6f8cf824401e0a3ddb7590adf2"
-
-[[projects]]
   digest = "1:3cf1904c55db348d6625de56dbede39ad62bc0b4a22a1e1b5e3a3d2f80710f7b"
   name = "sigs.k8s.io/controller-runtime"
   packages = [
@@ -1277,6 +1301,18 @@
     "github.com/ghodss/yaml",
     "github.com/onsi/ginkgo",
     "github.com/onsi/gomega",
+    "github.com/openshift/cluster-api/cmd/clusterctl/clientcmd",
+    "github.com/openshift/cluster-api/cmd/clusterctl/cmd",
+    "github.com/openshift/cluster-api/pkg/apis",
+    "github.com/openshift/cluster-api/pkg/apis/cluster/common",
+    "github.com/openshift/cluster-api/pkg/apis/cluster/v1alpha1",
+    "github.com/openshift/cluster-api/pkg/apis/machine/v1beta1",
+    "github.com/openshift/cluster-api/pkg/client/clientset_generated/clientset",
+    "github.com/openshift/cluster-api/pkg/client/clientset_generated/clientset/fake",
+    "github.com/openshift/cluster-api/pkg/client/clientset_generated/clientset/typed/cluster/v1alpha1",
+    "github.com/openshift/cluster-api/pkg/client/clientset_generated/clientset/typed/machine/v1beta1",
+    "github.com/openshift/cluster-api/pkg/controller/error",
+    "github.com/openshift/cluster-api/pkg/controller/machine",
     "github.com/pkg/errors",
     "github.com/spf13/cobra",
     "golang.org/x/crypto/ssh",
@@ -1304,17 +1340,6 @@
     "k8s.io/kubernetes/cmd/kubeadm/app/phases/kubeconfig",
     "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig",
     "k8s.io/kubernetes/cmd/kubeadm/app/util/pubkeypin",
-    "sigs.k8s.io/cluster-api/cmd/clusterctl/clientcmd",
-    "sigs.k8s.io/cluster-api/cmd/clusterctl/cmd",
-    "sigs.k8s.io/cluster-api/pkg/apis",
-    "sigs.k8s.io/cluster-api/pkg/apis/cluster/common",
-    "sigs.k8s.io/cluster-api/pkg/apis/cluster/v1alpha1",
-    "sigs.k8s.io/cluster-api/pkg/client/clientset_generated/clientset",
-    "sigs.k8s.io/cluster-api/pkg/client/clientset_generated/clientset/fake",
-    "sigs.k8s.io/cluster-api/pkg/client/clientset_generated/clientset/typed/cluster/v1alpha1",
-    "sigs.k8s.io/cluster-api/pkg/controller/error",
-    "sigs.k8s.io/cluster-api/pkg/controller/machine",
-    "sigs.k8s.io/cluster-api/pkg/util",
     "sigs.k8s.io/controller-runtime/pkg/client",
     "sigs.k8s.io/controller-runtime/pkg/client/config",
     "sigs.k8s.io/controller-runtime/pkg/client/fake",
