@@ -5,8 +5,6 @@ go_library(
     srcs = [
         "azureclusterproviderconfig_types.go",
         "azureclusterproviderstatus_types.go",
-        "azuremachineproviderconfig_types.go",
-        "azuremachineproviderstatus_types.go",
         "doc.go",
         "register.go",
         "types.go",
