@@ -38,6 +38,7 @@ func (s *Service) Get(ctx context.Context, spec azure.Spec) (interface{}, error)
 	if !ok {
 		return network.RouteTable{}, errors.New("Invalid Route Table Specification")
 	}
+
 	routeTable, err := s.Client.Get(ctx, s.Scope.MachineConfig.ResourceGroup, routeTableSpec.Name, "")
 	if err != nil && azure.ResourceNotFound(err) {
 		return nil, fmt.Errorf("route table %s not found: %w", routeTableSpec.Name, err)

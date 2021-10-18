@@ -23,6 +23,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"strconv"
 
 	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2021-03-01/compute"
 	"github.com/Azure/azure-sdk-for-go/services/network/mgmt/2021-02-01/network"
@@ -109,6 +110,7 @@ func (s *Service) CreateOrUpdate(ctx context.Context, spec azure.Spec) error {
 	if err != nil {
 		return err
 	}
+
 	nic, ok := nicInterface.(network.Interface)
 	if !ok {
 		return errors.New("error getting network security group")
@@ -117,7 +119,7 @@ func (s *Service) CreateOrUpdate(ctx context.Context, spec azure.Spec) error {
 
 	klog.V(2).Infof("creating vm %s ", vmSpec.Name)
 
-	virtualMachine, err := deriveVirtualMachineParameters(vmSpec, s.Scope.MachineConfig.Location, s.Scope.SubscriptionID, s.Scope.MachineConfig.ResourceGroup, nic)
+	virtualMachine, err := s.deriveVirtualMachineParameters(vmSpec, nic)
 	if err != nil {
 		return err
 	}
@@ -209,7 +211,7 @@ func generateOSProfile(vmSpec *Spec) (*compute.OSProfile, error) {
 // Derive virtual machine parameters for CreateOrUpdate API call based
 // on the provided virtual machine specification, resource location,
 // subscription ID, and the network interface.
-func deriveVirtualMachineParameters(vmSpec *Spec, location, subscription, resourceGroup string, nic network.Interface) (*compute.VirtualMachine, error) {
+func (s *Service) deriveVirtualMachineParameters(vmSpec *Spec, nic network.Interface) (*compute.VirtualMachine, error) {
 	osProfile, err := generateOSProfile(vmSpec)
 	if err != nil {
 		return nil, err
@@ -223,7 +225,7 @@ func deriveVirtualMachineParameters(vmSpec *Spec, location, subscription, resour
 	}
 	if vmSpec.Image.ResourceID != "" {
 		imageReference = &compute.ImageReference{
-			ID: to.StringPtr(fmt.Sprintf("/subscriptions/%s%s", subscription, vmSpec.Image.ResourceID)),
+			ID: to.StringPtr(fmt.Sprintf("/subscriptions/%s%s", s.Scope.SubscriptionID, vmSpec.Image.ResourceID)),
 		}
 	}
 
@@ -239,8 +241,13 @@ func deriveVirtualMachineParameters(vmSpec *Spec, location, subscription, resour
 		}
 	}
 
+	priority, evictionPolicy, billingProfile, err := getSpotVMOptions(s.Scope.MachineConfig.SpotVMOptions)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get Spot VM options %w", err)
+	}
+
 	virtualMachine := &compute.VirtualMachine{
-		Location: to.StringPtr(location),
+		Location: to.StringPtr(s.Scope.MachineConfig.Location),
 		Tags:     getTagListFromSpec(vmSpec),
 		VirtualMachineProperties: &compute.VirtualMachineProperties{
 			HardwareProfile: &compute.HardwareProfile{
@@ -271,9 +278,9 @@ func deriveVirtualMachineParameters(vmSpec *Spec, location, subscription, resour
 					},
 				},
 			},
-			Priority:       vmSpec.Priority,
-			EvictionPolicy: vmSpec.EvictionPolicy,
-			BillingProfile: vmSpec.BillingProfile,
+			Priority:       priority,
+			EvictionPolicy: evictionPolicy,
+			BillingProfile: billingProfile,
 		},
 	}
 
@@ -293,7 +300,7 @@ func deriveVirtualMachineParameters(vmSpec *Spec, location, subscription, resour
 
 	if vmSpec.AvailabilitySetName != "" {
 		virtualMachine.AvailabilitySet = &compute.SubResource{
-			ID: to.StringPtr(availabilitySetID(subscription, resourceGroup, vmSpec.AvailabilitySetName)),
+			ID: to.StringPtr(availabilitySetID(s.Scope.SubscriptionID, s.Scope.MachineConfig.ResourceGroup, vmSpec.AvailabilitySetName)),
 		}
 	}
 
@@ -356,4 +363,25 @@ func GenerateRandomString(n int) (string, error) {
 
 func availabilitySetID(subscriptionID, resourceGroup, availabilitySetName string) string {
 	return fmt.Sprintf("/subscriptions/%s/resourceGroups/%s/providers/Microsoft.Compute/availabilitySets/%s", subscriptionID, resourceGroup, availabilitySetName)
+}
+
+func getSpotVMOptions(spotVMOptions *v1beta1.SpotVMOptions) (compute.VirtualMachinePriorityTypes, compute.VirtualMachineEvictionPolicyTypes, *compute.BillingProfile, error) {
+	// Spot VM not requested, return zero values to apply defaults
+	if spotVMOptions == nil {
+		return compute.VirtualMachinePriorityTypes(""), compute.VirtualMachineEvictionPolicyTypes(""), nil, nil
+	}
+	var billingProfile *compute.BillingProfile
+	if spotVMOptions.MaxPrice != nil && spotVMOptions.MaxPrice.AsDec().String() != "" {
+		maxPrice, err := strconv.ParseFloat(spotVMOptions.MaxPrice.AsDec().String(), 64)
+		if err != nil {
+			return compute.VirtualMachinePriorityTypes(""), compute.VirtualMachineEvictionPolicyTypes(""), nil, err
+		}
+		billingProfile = &compute.BillingProfile{
+			MaxPrice: &maxPrice,
+		}
+	}
+
+	// We should use deallocate eviction policy it's - "the only supported eviction policy for Single Instance Spot VMs"
+	// https://github.com/openshift/enhancements/blob/master/enhancements/machine-api/spot-instances.md#eviction-policies
+	return compute.VirtualMachinePriorityTypesSpot, compute.VirtualMachineEvictionPolicyTypesDeallocate, billingProfile, nil
 }
